@@ -1,6 +1,8 @@
 // https://stackoverflow.com/questions/46745014/alternative-for-dirname-in-node-js-when-using-es6-modules
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { format } from 'node:util';
+import { appendFileSync } from 'node:fs';
 // not the same since these will give the absolute paths for this file instead of for the file using them
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +11,19 @@ export const dataDir = s => path.resolve(__dirname, '..', 'data', s);
 
 // modified path.resolve to return null if first argument is '0', used to disable screenshots
 export const resolve = (...a) => a.length && a[0] == '0' ? null : path.resolve(...a);
+
+// Logging used by ClaimGames.cmd (inactive when FGC_LOG_FILE is not set):
+// append all console output to the given file, in addition to the console
+const fgcLogFile = process.env.FGC_LOG_FILE;
+if (fgcLogFile) {
+  for (const level of ['log', 'info', 'debug', 'error', 'warn']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+      appendFileSync(fgcLogFile, `${format(...args)}\n`);
+      original(...args);
+    };
+  }
+}
 
 // json database
 import { JSONFilePreset } from 'lowdb/node';
