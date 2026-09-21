@@ -6,11 +6,15 @@
 import { launchContext } from './src/browser.js';
 import { jsonDb, datetime, filenamify, prompt, confirm, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
+import chalk from 'chalk';
 
 // using https://github.com/apify/fingerprint-suite worked, but has no launchPersistentContext...
 // from https://github.com/apify/fingerprint-suite/issues/162
 import { FingerprintInjector } from 'fingerprint-injector';
 import { FingerprintGenerator } from 'fingerprint-generator';
+
+const lavender = chalk.hex('#b57edc'); // color for game names
+const pastelGreen = chalk.hex('#77dd77'); // color for "already in library" messages
 
 console.log(datetime(), 'started checking steam');
 
@@ -121,7 +125,7 @@ try {
 
   const notify_games = []; // collect games for notification
   for (const game of games) {
-    console.log('Current free game:', game.title);
+    console.log('Current free game:', lavender(game.title));
     if (db.data[user][game.title]?.status == 'claimed') {
       console.log('  Already claimed.');
       continue; // don't notify or touch the db entry again
@@ -133,6 +137,7 @@ try {
     // when already owned, the purchase area shows a different block and there is no claim button
     const claim = page.locator('.btn_addtocart a[href*="addToCart"], #add_to_cart');
     if (!await claim.count()) {
+      console.log(pastelGreen('  Already in library! Nothing to claim.'));
       notify_game.status = 'existed';
       continue;
     }

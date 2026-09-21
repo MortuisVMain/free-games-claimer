@@ -9,6 +9,8 @@ const screenshot = (...a) => resolve(cfg.dir.screenshots, 'prime-gaming', ...a);
 // const URL_LOGIN = 'https://www.amazon.de/ap/signin'; // wrong. needs some session args to be valid?
 const BASE_URL = 'https://luna.amazon.com'; // Prime Gaming was rebranded/migrated to Amazon Luna
 const URL_CLAIM = `${BASE_URL}/claims/home`;
+const lavender = chalk.hex('#b57edc'); // color for game names
+const pastelBlue = chalk.hex('#add8e6'); // color for URLs
 
 console.log(datetime(), 'started checking prime-gaming');
 
@@ -166,7 +168,7 @@ try {
     const title = await (await card.$('.item-card-details__body__primary')).innerText();
     const slug = await (await card.$('a')).getAttribute('href');
     const url = `${BASE_URL}${slug.split('?')[0]}`;
-    console.log('Current free game:', chalk.blue(title));
+    console.log('Current free game:', lavender(title));
     if (cfg.pg_timeLeft && await skipBasedOnTime(url)) continue;
     if (cfg.dryrun) continue;
     if (cfg.interactive && !await confirm()) continue;
@@ -189,7 +191,7 @@ try {
   }
   // external_info = [ { title: 'Fallout 76 (XBOX)', url: 'https://gaming.amazon.com/fallout-76-xbox-fgwp/dp/amzn1.pg.item.9fe17d7b-b6c2-4f58-b494-cc4e79528d0b?ingress=amzn&ref_=SM_Fallout76XBOX_S01_FGWP_CRWN' } ];
   for (const { title, url } of external_info) {
-    console.log('Current free game:', chalk.blue(title)); // , url);
+    console.log('Current free game:', lavender(title)); // , url);
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     if (cfg.debug) await page.pause();
     // The offer detail page is not always available: expired/rebranded offers show an error page instead.
@@ -247,7 +249,7 @@ try {
         }
         let redeem_url = redeem[store];
         if (store == 'gog.com') redeem_url += '/' + code; // to log and notify, but can't use for goto below (captcha)
-        console.log('  URL to redeem game:', redeem_url);
+        console.log('  URL to redeem game:', pastelBlue(redeem_url));
         db.data[user][title].code = code;
         let redeem_action = 'redeem';
         if (cfg.pg_redeem) { // try to redeem keys on external stores
@@ -433,7 +435,7 @@ try {
           unlinked_store = 'epic-games';
         }
         if (unlinked_store) {
-          console.error('  Missing account linking:', unlinked_store, url);
+          console.error('  Missing account linking:', unlinked_store, pastelBlue(url));
           dlc_unlinked[unlinked_store] ??= [];
           dlc_unlinked[unlinked_store].push(title);
         } else {

@@ -10,6 +10,9 @@ const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
 const URL_CLAIM = 'https://store.epicgames.com/en-US/free-games';
 const URL_LOGIN = 'https://www.epicgames.com/id/login?lang=en-US&noHostRedirect=true&redirectUrl=' + URL_CLAIM;
+const lavender = chalk.hex('#b57edc'); // color for game names
+const pastelGreen = chalk.hex('#77dd77'); // color for "already in library" messages
+const pastelBlue = chalk.hex('#add8e6'); // color for URLs
 
 console.log(datetime(), 'started checking epic-games');
 
@@ -142,7 +145,8 @@ try {
   // i.e. filter data.Catalog.searchStore.elements for .promotions.promotionalOffers being set and build URL with .catalogNs.mappings[0].pageSlug or .urlSlug if not set to some wrong id like it was the case for spirit-of-the-north-f58a66 - this is also what's done here: https://github.com/claabs/epicgames-freegames-node/blob/938a9653ffd08b8284ea32cf01ac8727d25c5d4c/src/puppet/free-games.ts#L138-L213
   const urlSlugs = await Promise.all((await game_loc.elementHandles()).map(a => a.getAttribute('href')));
   const urls = urlSlugs.map(s => 'https://store.epicgames.com' + s);
-  console.log('Free games:', urls);
+  // avoid console.log(array): util.inspect escapes the color codes and wraps strings in its own green
+  console.log(`Free games:\n  ${urls.map(u => pastelBlue(u)).join('\n  ')}`);
 
   for (const url of urls) {
     if (cfg.time) console.time('claim game');
@@ -188,13 +192,13 @@ try {
     const game_id = page.url().split('/').pop();
     const existedInDb = db.data[user][game_id];
     db.data[user][game_id] ||= { title, time: datetime(), url: page.url() }; // this will be set on the initial run only!
-    console.log('Current free game:', chalk.blue(title));
+    console.log('Current free game:', lavender(title));
     if (bundle_includes) console.log('  This bundle includes:', bundle_includes);
     const notify_game = { title, url, status: 'failed' };
     notify_games.push(notify_game); // status is updated below
 
     if (btnText == 'in library') {
-      console.log('  Already in library! Nothing to claim.');
+      console.log(pastelGreen('  Already in library! Nothing to claim.'));
       if (!existedInDb) await notify(`Game already in library: ${url}`);
       notify_game.status = 'existed';
       db.data[user][game_id].status ||= 'existed'; // does not overwrite claimed or failed
@@ -205,7 +209,7 @@ try {
       db.data[user][game_id].status ||= 'failed:requires-base-game';
       // TODO claim base game if it is free
       const baseUrl = 'https://store.epicgames.com' + await page.locator('a:has-text("Overview")').getAttribute('href');
-      console.log('  Base game:', baseUrl);
+      console.log('  Base game:', pastelBlue(baseUrl));
       // await page.click('a:has-text("Overview")');
       // TODO handle this via function call for base game above since this will never terminate if DRYRUN=1
       urls.push(baseUrl); // add base game to the list of games to claim

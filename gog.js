@@ -6,6 +6,9 @@ import { cfg } from './src/config.js';
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'gog', ...a);
 
 const URL_CLAIM = 'https://www.gog.com/en';
+const lavender = chalk.hex('#b57edc'); // color for game names
+const pastelGreen = chalk.hex('#77dd77'); // color for "already in library" messages
+const pastelBlue = chalk.hex('#add8e6'); // color for URLs
 
 console.log(datetime(), 'started checking gog');
 
@@ -165,7 +168,7 @@ try {
     const match_all = text.match(/Claim (.*) and don't miss the|Success! (.*) was added to/);
     const title = match_all[1] ? match_all[1] : match_all[2];
     const url = await banner.locator('a').first().getAttribute('href');
-    console.log(`Current free game: ${chalk.blue(title)} - ${url}`);
+    console.log(`Current free game: ${lavender(title)} - ${pastelBlue(url)}`);
     db.data[user][title] ||= { title, time: datetime(), url };
     if (cfg.dryrun) process.exit(1);
     // await page.locator('#giveaway:not(.is-loading)').waitFor(); // otherwise screenshot is sometimes with loading indicator instead of game title; #TODO fix, skipped due to timeout, see #240
@@ -188,7 +191,7 @@ try {
       const message = JSON.parse(response).message;
       if (message == 'Already claimed') {
         status = 'existed'; // same status text as for epic-games
-        console.log('  Already in library! Nothing to claim.');
+        console.log(pastelGreen('  Already in library! Nothing to claim.'));
       } else {
         console.log(response);
         status = message;
