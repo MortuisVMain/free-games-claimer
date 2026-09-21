@@ -25,7 +25,34 @@ set "FGC_LOG_FILE="
 set "FGC_MINIMIZE="
 
 rem ---- parse arguments ----
-call :parseArgs %*
+rem parse here instead of in a called routine: forwarding the raw "/?" via `call :parse %*`
+rem would make cmd print its own CALL help instead of reaching our parser
+:parse_args
+if "%~1"=="" goto :after_parse
+set "ARG=%~1"
+set "PREFIX=!ARG:~0,1!"
+if "!PREFIX!"=="-" goto :parse_flag
+if "!PREFIX!"=="/" goto :parse_flag
+if "!IN_CLAIM!"=="1" (
+    call :addPlatform "%~1"
+) else (
+    echo [ERROR] Unexpected argument: %~1
+    set "PARSE_ERR=1"
+)
+goto :parse_next
+
+:parse_flag
+set "IN_CLAIM=0"
+set "KNOWN=0"
+call :handleFlag "%~1"
+if "!KNOWN!"=="0" (
+    echo [ERROR] Unknown option: %~1
+    set "PARSE_ERR=1"
+)
+
+:parse_next
+shift
+goto :parse_args
 
 :after_parse
 if defined SHOWHELP (
@@ -87,30 +114,6 @@ exit /b 0
 
 rem ==================== subroutines ====================
 
-:parseArgs
-rem called with the full argument list; shift is used since it works reliably
-rem inside a called routine (unlike inside a for loop)
-if "%~1"=="" exit /b 0
-set "ARG=%~1"
-if "!ARG:~0,1!"=="-" (
-    set "IN_CLAIM=0"
-    set "KNOWN=0"
-    call :handleFlag "%~1"
-    if "!KNOWN!"=="0" (
-        echo [ERROR] Unknown option: %~1
-        set "PARSE_ERR=1"
-    )
-) else (
-    if "!IN_CLAIM!"=="1" (
-        call :addPlatform "%~1"
-    ) else (
-        echo [ERROR] Unexpected argument: %~1
-        set "PARSE_ERR=1"
-    )
-)
-shift
-goto :parseArgs
-
 :handleFlag
 if /i "%~1"=="--h"        ( set "SHOW=0" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="-h"         ( set "SHOW=0" & set "KNOWN=1" & exit /b 0 )
@@ -127,7 +130,9 @@ if /i "%~1"=="--update"   ( set "UPDATE=1" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="--c"        ( set "IN_CLAIM=1" & set "CLAIM_SPECIFIED=1" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="-c"         ( set "IN_CLAIM=1" & set "CLAIM_SPECIFIED=1" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="--claim"    ( set "IN_CLAIM=1" & set "CLAIM_SPECIFIED=1" & set "KNOWN=1" & exit /b 0 )
-if /i "%~1"=="--help"     ( set "SHOWHELP=1" & set "KNOWN=1" & exit /b 0 )
+if /i "%~1"=="/?"        ( set "SHOWHELP=1" & set "KNOWN=1" & exit /b 0 )
+if /i "%~1"=="-?"        ( set "SHOWHELP=1" & set "KNOWN=1" & exit /b 0 )
+if /i "%~1"=="--help"    ( set "SHOWHELP=1" & set "KNOWN=1" & exit /b 0 )
 exit /b 0
 
 :addPlatform
@@ -202,6 +207,8 @@ exit /b 0
 echo.
 echo Usage: ClaimGames.cmd [options]
 echo.
+echo   Run without options to claim all stores headless.
+echo.
 echo   --h, -h, --headless  Run without showing the browser [default]
 echo   --s, -s, --show      Show the browser while claiming
 echo                        Without it, stores that cannot run headless open a
@@ -212,10 +219,11 @@ echo                        Example: ClaimGames.cmd --claim epic prime gog
 echo                        Default [no --claim]: all platforms
 echo   --l, -l, --log       Save all output to ClaimOutput_^<date^>.log
 echo   --u, -u, --update    Update the repository via "git pull"
-echo   --help               Show this help
+echo   --help, /?           Show this help
 echo.
 echo Examples:
 echo   ClaimGames.cmd
+echo   ClaimGames.cmd /?
 echo   ClaimGames.cmd --show
 echo   ClaimGames.cmd --claim epic prime
 echo   ClaimGames.cmd --headless --claim gog steam --log
