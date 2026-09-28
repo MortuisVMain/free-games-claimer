@@ -5,11 +5,13 @@
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=vogler_free-games-claimer&metric=code_smells)](https://sonarcloud.io/project/overview?id=vogler_free-games-claimer)
 # free-games-claimer
 
-Claims free games periodically on
+Claims free games and game dev assets periodically on:
 - <img src="https://github.com/user-attachments/assets/82e9e9bf-b6ac-4f20-91db-36d2c8429cb6" width="32" align="middle" /> [Epic Games Store](https://www.epicgames.com/store/free-games)
-- <img src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Amazon Prime Gaming](https://gaming.amazon.com)
+- <img src="https://github.com/user-attachments/assets/3582444b-f23b-448d-bf31-01668cd0313a" width="32" align="middle" /> [Fab.com / Unreal Engine](https://www.fab.com/limited-time-free) (replaces discontinued UE Marketplace, supports Limited-Time Free assets & 100% discount promotional packs)
 - <img src="https://github.com/user-attachments/assets/49040b50-ee14-4439-8e3c-e93cafd7c3a5" width="32" align="middle" /> [GOG](https://www.gog.com)
-- <img src="https://github.com/user-attachments/assets/3582444b-f23b-448d-bf31-01668cd0313a" width="32" align="middle" /> [Unreal Engine (Assets)](https://www.unrealengine.com/marketplace/en-US/assets?count=20&sortBy=effectiveDate&sortDir=DESC&start=0&tag=4910) ([experimental](https://github.com/vogler/free-games-claimer/issues/44), same login as Epic Games)
+- <img src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Steam](https://store.steampowered.com)
+- <img src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Amazon Prime Gaming](https://gaming.amazon.com) (optional)
+- *[Unity Asset Store](https://assetstore.unity.com)* (Free Asset of the Week — planned)
 <!-- - <img src="https://www.freepnglogos.com/uploads/xbox-logo-picture-png-14.png" width="32"/> [Xbox Live Games with Gold](https://www.xbox.com/en-US/live/gold#gameswithgold) ([experimental](https://github.com/vogler/free-games-claimer/issues/19)) -->
 
 Pull requests welcome :)
@@ -46,6 +48,20 @@ If you are missing some dependencies for the browser on your system, you can use
 
 If you don't want to use Docker for quasi-headless mode, you could run inside a virtual machine, on a server, or you wake your PC at night to avoid being interrupted.
 </details>
+
+### Windows Quick Start (Native, No Docker Required)
+For Windows users, pre-configured launcher scripts are included:
+* **First Time Setup / Login:** Double-click `FirstTimeLogin.bat` (or run `ClaimGames.cmd --show`) to log into your Epic, GOG, Steam, and Fab accounts.
+* **Claim All Stores (Stealth):** Double-click `ClaimGames.cmd` or run:
+  ```cmd
+  ClaimGames.cmd
+  ```
+  Runs Epic, GOG, Steam, and Fab. Stores that require visible browsers are automatically minimized via Chrome DevTools Protocol (`Browser.setWindowBounds`) to avoid interrupting your work.
+* **Claim Specific Stores:**
+  ```cmd
+  ClaimGames.cmd --claim epic fab gog
+  ```
+* **Scheduled Automation:** Use Windows Task Scheduler with `StudioClaimLauncher.bat` for silent periodic claiming with automatic logging to `ClaimOutput_<date>.log`.
 
 ## Usage
 All scripts start an automated browser instance via Patchright (Chromium). `epic-games`, `prime-gaming`, `gog` and `unrealengine` run with the browser shown to avoid captcha challenges; `aliexpress`, `steam` and `steam-games` run hidden unless `SHOW=1` is set.
