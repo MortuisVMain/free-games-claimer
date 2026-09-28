@@ -66,14 +66,14 @@ if defined PARSE_ERR (
 )
 if "%CLAIM_SPECIFIED%"=="1" (
     if "%PLATFORMS%"=="" (
-        echo [ERROR] --claim requires at least one platform: epic prime gog steam fab unreal
+        echo [ERROR] --claim requires at least one platform: epic prime gog steam fab unreal unity
         echo.
         call :usage
         exit /b 1
     )
 ) else (
-    rem no --claim given: claim active platforms (epic, gog, steam, fab)
-    set "PLATFORMS= epic gog steam fab"
+    rem no --claim given: claim active platforms (epic, gog, steam, fab, unity)
+    set "PLATFORMS= epic gog steam fab unity"
 )
 
 rem ---- update repository ----
@@ -144,8 +144,9 @@ if /i "%~1"=="steam"  goto :add_steam
 if /i "%~1"=="unreal" goto :add_unreal
 if /i "%~1"=="ue"     goto :add_unreal
 if /i "%~1"=="fab"    goto :add_fab
+if /i "%~1"=="unity"  goto :add_unity
 echo [ERROR] Unknown platform: %~1
-echo         Valid platforms: epic prime gog steam fab unreal
+echo         Valid platforms: epic prime gog steam fab unreal unity
 set "PARSE_ERR=1"
 exit /b 0
 
@@ -167,6 +168,9 @@ exit /b 0
 :add_fab
 if not defined HAS_FAB ( set "HAS_FAB=1" & set "PLATFORMS=!PLATFORMS! fab" )
 exit /b 0
+:add_unity
+if not defined HAS_UNITY ( set "HAS_UNITY=1" & set "PLATFORMS=!PLATFORMS! unity" )
+exit /b 0
 
 :claim
 if /i "%~1"=="epic"   goto :claim_epic
@@ -176,6 +180,7 @@ if /i "%~1"=="steam"  goto :claim_steam
 if /i "%~1"=="unreal" goto :claim_unreal
 if /i "%~1"=="ue"     goto :claim_unreal
 if /i "%~1"=="fab"    goto :claim_fab
+if /i "%~1"=="unity"  goto :claim_unity
 exit /b 0
 
 :claim_epic
@@ -195,6 +200,9 @@ call :runScript "fab" "Fab / Unreal Engine"
 exit /b 0
 :claim_fab
 call :runScript "fab" "Fab / Unreal Engine"
+exit /b 0
+:claim_unity
+call :runScript "unity" "Unity Asset Store"
 exit /b 0
 
 :runScript

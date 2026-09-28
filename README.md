@@ -10,8 +10,7 @@ Claims free games and game dev assets periodically on:
 - <img src="https://github.com/user-attachments/assets/3582444b-f23b-448d-bf31-01668cd0313a" width="32" align="middle" /> [Fab.com / Unreal Engine](https://www.fab.com/limited-time-free) (replaces discontinued UE Marketplace, supports Limited-Time Free assets & 100% discount promotional packs)
 - <img src="https://github.com/user-attachments/assets/49040b50-ee14-4439-8e3c-e93cafd7c3a5" width="32" align="middle" /> [GOG](https://www.gog.com)
 - <img src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Steam](https://store.steampowered.com)
-- <img src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Amazon Prime Gaming](https://gaming.amazon.com) (optional)
-- *[Unity Asset Store](https://assetstore.unity.com)* (Free Asset of the Week — planned)
+- [Unity Asset Store](https://assetstore.unity.com/publisher-sale) (Publisher of the Week free asset & coupon checkout via unity.js)
 <!-- - <img src="https://www.freepnglogos.com/uploads/xbox-logo-picture-png-14.png" width="32"/> [Xbox Live Games with Gold](https://www.xbox.com/en-US/live/gold#gameswithgold) ([experimental](https://github.com/vogler/free-games-claimer/issues/19)) -->
 
 Pull requests welcome :)

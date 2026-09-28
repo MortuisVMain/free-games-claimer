@@ -18,8 +18,8 @@ Future enhancements and platform expansions for the studio freebie automation en
 
 ## 🚀 Phase 2: Unity Asset Store & Expansion (Active Development)
 
-### 1. Unity Asset Store Claimer (`unity.js`)
-* **Goal:** Automatically claim the weekly paid asset featured in Unity's "Publisher of the Week / Free Asset of the Week" giveaway ($15–$60 average value).
+### 1. Unity Asset Store Claimer (`unity.js`) - ✅ Completed
+* **Status:** Implemented in `unity.js`. Automatically scrapes "Publisher of the Week" banner, extracts asset URL and weekly coupon code (e.g. `MAGICPIGGAMES`), checks library ownership, applies coupon in cart to $0.00, and claims to Unity ID.
 * **Architecture:**
   1. **Discovery:** Scrape `https://assetstore.unity.com/` hero banner and active campaign cards to dynamically extract:
      - Target Asset PDP URL.
