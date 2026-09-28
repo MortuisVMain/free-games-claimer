@@ -66,14 +66,14 @@ if defined PARSE_ERR (
 )
 if "%CLAIM_SPECIFIED%"=="1" (
     if "%PLATFORMS%"=="" (
-        echo [ERROR] --claim requires at least one platform: epic prime gog steam
+        echo [ERROR] --claim requires at least one platform: epic prime gog steam fab unreal
         echo.
         call :usage
         exit /b 1
     )
 ) else (
-    rem no --claim given: claim all platforms
-    set "PLATFORMS= epic prime gog steam"
+    rem no --claim given: claim active platforms (epic, gog, steam, fab)
+    set "PLATFORMS= epic gog steam fab"
 )
 
 rem ---- update repository ----
@@ -108,13 +108,14 @@ for %%P in (%PLATFORMS%) do call :claim "%%P"
 
 echo.
 echo Complete
-pause
+if not "%NOPAUSE%"=="1" if not defined FGC_NOPAUSE pause
 exit /b 0
 
 
 rem ==================== subroutines ====================
 
 :handleFlag
+if /i "%~1"=="--nopause"  ( set "NOPAUSE=1" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="--h"        ( set "SHOW=0" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="-h"         ( set "SHOW=0" & set "KNOWN=1" & exit /b 0 )
 if /i "%~1"=="--headless" ( set "SHOW=0" & set "KNOWN=1" & exit /b 0 )
@@ -136,12 +137,15 @@ if /i "%~1"=="--help"    ( set "SHOWHELP=1" & set "KNOWN=1" & exit /b 0 )
 exit /b 0
 
 :addPlatform
-if /i "%~1"=="epic"  goto :add_epic
-if /i "%~1"=="prime" goto :add_prime
-if /i "%~1"=="gog"   goto :add_gog
-if /i "%~1"=="steam" goto :add_steam
+if /i "%~1"=="epic"   goto :add_epic
+if /i "%~1"=="prime"  goto :add_prime
+if /i "%~1"=="gog"    goto :add_gog
+if /i "%~1"=="steam"  goto :add_steam
+if /i "%~1"=="unreal" goto :add_unreal
+if /i "%~1"=="ue"     goto :add_unreal
+if /i "%~1"=="fab"    goto :add_fab
 echo [ERROR] Unknown platform: %~1
-echo         Valid platforms: epic prime gog steam
+echo         Valid platforms: epic prime gog steam fab unreal
 set "PARSE_ERR=1"
 exit /b 0
 
@@ -157,12 +161,21 @@ exit /b 0
 :add_steam
 if not defined HAS_STEAM ( set "HAS_STEAM=1" & set "PLATFORMS=!PLATFORMS! steam" )
 exit /b 0
+:add_unreal
+if not defined HAS_UNREAL ( set "HAS_UNREAL=1" & set "PLATFORMS=!PLATFORMS! unreal" )
+exit /b 0
+:add_fab
+if not defined HAS_FAB ( set "HAS_FAB=1" & set "PLATFORMS=!PLATFORMS! fab" )
+exit /b 0
 
 :claim
-if /i "%~1"=="epic"  goto :claim_epic
-if /i "%~1"=="prime" goto :claim_prime
-if /i "%~1"=="gog"   goto :claim_gog
-if /i "%~1"=="steam" goto :claim_steam
+if /i "%~1"=="epic"   goto :claim_epic
+if /i "%~1"=="prime"  goto :claim_prime
+if /i "%~1"=="gog"    goto :claim_gog
+if /i "%~1"=="steam"  goto :claim_steam
+if /i "%~1"=="unreal" goto :claim_unreal
+if /i "%~1"=="ue"     goto :claim_unreal
+if /i "%~1"=="fab"    goto :claim_fab
 exit /b 0
 
 :claim_epic
@@ -176,6 +189,12 @@ call :runScript "gog" "GOG"
 exit /b 0
 :claim_steam
 call :runScript "steam" "Steam"
+exit /b 0
+:claim_unreal
+call :runScript "fab" "Fab / Unreal Engine"
+exit /b 0
+:claim_fab
+call :runScript "fab" "Fab / Unreal Engine"
 exit /b 0
 
 :runScript
