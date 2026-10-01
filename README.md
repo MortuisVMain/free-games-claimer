@@ -50,7 +50,7 @@ If you don't want to use Docker for quasi-headless mode, you could run inside a 
 
 ### Windows Quick Start (Native, No Docker Required)
 * 🇷🇺 **Подробная инструкция на русском**: см. [**`INSTRUCTION_RU.md`**](INSTRUCTION_RU.md).
-* **1-Click Setup:** Run `Setup.bat` to verify Node.js, install dependencies, fetch the Patchright browser, and create a Desktop shortcut with a custom icon.
+* **1-Click Setup:** Run `Setup.bat` to automatically install Node.js LTS (if missing), install dependencies, fetch the Patchright browser, and create a Desktop shortcut with a custom icon.
 * **First Time Login:** Double-click `FirstTimeLogin.bat` (or run `ClaimGames.cmd --show`) to log into your Epic, GOG, Steam, Fab, and Unity accounts.
 * **1-Click Task Scheduler:** Double-click `InstallScheduler.bat` to schedule automated claims (Tue, Fri, Sun at 13:30 in silent background mode). Run `UninstallScheduler.bat` to remove.
 * **Claim All Stores (Stealth):** Double-click `ClaimGames.cmd` or run:
