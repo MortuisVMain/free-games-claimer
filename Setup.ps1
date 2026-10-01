@@ -95,7 +95,7 @@ Write-Host ""
 
 # 3. Install Patchright Chromium browser engine
 Write-Host "[3/3] Downloading stealth browser engine (Patchright Chromium)..." -ForegroundColor Cyan
-cmd.exe /c "npx patchright install chrome"
+cmd.exe /c "npx patchright install chromium chrome"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARN] Browser download encountered a warning. Continuing..." -ForegroundColor Yellow
 }

@@ -6,12 +6,12 @@ const ENGINES = {
   patchright: {
     package: 'patchright',
     browser: 'chromium',
-    install: 'npm install && npx patchright install chrome',
+    install: 'npm install && npx patchright install chromium chrome',
   },
   playwright: {
     package: 'playwright',
     browser: 'chromium',
-    install: 'npm install playwright && npx playwright install chrome',
+    install: 'npm install playwright && npx playwright install chromium chrome',
   },
 };
 
@@ -83,7 +83,54 @@ export const launchContext = async (cfg, options) => {
   const args = options.args ?? [];
   const hasProxyArg = args.some(a => proxyArgs.some(p => a.startsWith(p)));
   if (!hasProxyArg) options.args = [...args, '--no-proxy-server'];
-  const context = await browser.launchPersistentContext(cfg.dir.browser, options);
+
+  let context;
+  const launch = opts => browser.launchPersistentContext(cfg.dir.browser, opts);
+
+  try {
+    context = await launch(options);
+  } catch (error) {
+    const isChannelError = options.channel && (
+      error.message.includes('Chromium distribution') ||
+      error.message.includes('not found') ||
+      error.message.includes("Executable doesn't exist") ||
+      error.message.includes('Cannot find') ||
+      error.message.toLowerCase().includes('channel')
+    );
+
+    if (isChannelError) {
+      console.warn(`[WARN] Browser channel "${options.channel}" is not available on this system.`);
+      // On Windows, Microsoft Edge is always pre-installed
+      if (process.platform === 'win32' && options.channel !== 'msedge') {
+        try {
+          console.log('[INFO] Attempting fallback to Microsoft Edge (msedge)...');
+          context = await launch({ ...options, channel: 'msedge' });
+        } catch {
+          // Edge not available or failed, fall through to bundled Chromium
+        }
+      }
+      if (!context) {
+        console.log('[INFO] Falling back to bundled Patchright Chromium...');
+        const fallbackOpts = { ...options };
+        delete fallbackOpts.channel;
+        try {
+          context = await launch(fallbackOpts);
+        } catch (bundledError) {
+          if (bundledError.message.includes("Executable doesn't exist")) {
+            console.log('[INFO] Bundled Chromium binary not found. Automatically running "npx patchright install chromium"...');
+            const { execSync } = await import('child_process');
+            execSync('npx patchright install chromium', { stdio: 'inherit' });
+            context = await launch(fallbackOpts);
+          } else {
+            throw bundledError;
+          }
+        }
+      }
+    } else {
+      throw error;
+    }
+  }
+
   // minimize only when a store forces a visible browser although headless was requested;
   // ClaimGames.cmd sets FGC_MINIMIZE for that case, so an explicit SHOW=1 stays visible
   if (options.headless === false && process.env.FGC_MINIMIZE == '1') await minimizeWindow(context);
