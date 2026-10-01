@@ -4,3 +4,5 @@ data/
 logs/
 ClaimOutput_*.log
 .sisyphus/
+desktop.ini
+icon.ico

@@ -241,8 +241,8 @@ echo   --s, -s, --show      Show the browser while claiming
 echo                        Without it, stores that cannot run headless open a
 echo                        minimized browser
 echo   --c, -c, --claim ... Claim only the given platforms, in the given order
-echo                        Valid platforms: epic prime gog steam
-echo                        Example: ClaimGames.cmd --claim epic prime gog
+echo                        Valid platforms: epic prime gog steam fab unity
+echo                        Example: ClaimGames.cmd --claim epic fab gog
 echo                        Default [no --claim]: all platforms
 echo   --l, -l, --log       Save all output to ClaimOutput_^<date^>.log
 echo   --u, -u, --update    Update the repository via "git pull"

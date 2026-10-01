@@ -49,18 +49,19 @@ If you don't want to use Docker for quasi-headless mode, you could run inside a 
 </details>
 
 ### Windows Quick Start (Native, No Docker Required)
-For Windows users, pre-configured launcher scripts are included:
-* **First Time Setup / Login:** Double-click `FirstTimeLogin.bat` (or run `ClaimGames.cmd --show`) to log into your Epic, GOG, Steam, and Fab accounts.
+* 🇷🇺 **Подробная инструкция на русском**: см. [**`INSTRUCTION_RU.md`**](INSTRUCTION_RU.md).
+* **1-Click Setup:** Run `Setup.bat` to verify Node.js, install dependencies, fetch the Patchright browser, and create a Desktop shortcut with a custom icon.
+* **First Time Login:** Double-click `FirstTimeLogin.bat` (or run `ClaimGames.cmd --show`) to log into your Epic, GOG, Steam, Fab, and Unity accounts.
+* **1-Click Task Scheduler:** Double-click `InstallScheduler.bat` to schedule automated claims (Tue, Fri, Sun at 13:30 in silent background mode). Run `UninstallScheduler.bat` to remove.
 * **Claim All Stores (Stealth):** Double-click `ClaimGames.cmd` or run:
   ```cmd
   ClaimGames.cmd
   ```
-  Runs Epic, GOG, Steam, and Fab. Stores that require visible browsers are automatically minimized via Chrome DevTools Protocol (`Browser.setWindowBounds`) to avoid interrupting your work.
+  Runs Epic, GOG, Steam, Fab, and Unity. Stores that require visible browsers are automatically minimized via Chrome DevTools Protocol (`Browser.setWindowBounds`) to avoid interrupting your work.
 * **Claim Specific Stores:**
   ```cmd
-  ClaimGames.cmd --claim epic fab gog
+  ClaimGames.cmd --claim epic fab gog unity
   ```
-* **Scheduled Automation:** Use Windows Task Scheduler with `StudioClaimLauncher.bat` for silent periodic claiming with automatic logging to `ClaimOutput_<date>.log`.
 
 ## Usage
 All scripts start an automated browser instance via Patchright (Chromium). `epic-games`, `prime-gaming`, `gog` and `unrealengine` run with the browser shown to avoid captcha challenges; `aliexpress`, `steam` and `steam-games` run hidden unless `SHOW=1` is set.
