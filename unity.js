@@ -36,7 +36,7 @@ await page.setViewportSize({ width: cfg.width, height: cfg.height });
 try {
   // 1. Check login state by testing cart access
   console.log('Checking Unity ID login status...');
-  await page.goto('https://assetstore.unity.com/orders/cart', { waitUntil: 'domcontentloaded', timeout: 35000 });
+  await page.goto('https://assetstore.unity.com/account/cart', { waitUntil: 'domcontentloaded', timeout: 35000 });
   await page.waitForTimeout(4000);
 
   // Clear cookie banner if present
@@ -114,36 +114,145 @@ try {
         if (cfg.dryrun) {
           console.log('    DRYRUN=1 -> Skip order');
         } else {
-          // Add to cart
-          const addToCartBtn = page.locator('button:has-text("Add to Cart")').first();
-          await addToCartBtn.click();
+          // Clear cart first to prevent leftover paid items from blocking free checkout
+          console.log('    Checking and clearing cart...');
+          await page.goto('https://assetstore.unity.com/account/cart', { waitUntil: 'domcontentloaded', timeout: 35000 });
           await page.waitForTimeout(3000);
 
-          // Navigate to cart
-          await page.goto('https://assetstore.unity.com/orders/cart', { waitUntil: 'domcontentloaded' });
+          const clearCartBtn = page.locator('button:has-text("Clear Cart")').first();
+          if (await clearCartBtn.isVisible().catch(() => false)) {
+            console.log('    Clearing existing cart items...');
+            await clearCartBtn.click();
+            await page.waitForTimeout(1000);
+            const confirmClearBtn = page.locator('button:has-text("Confirm")').first();
+            if (await confirmClearBtn.isVisible().catch(() => false)) {
+              await confirmClearBtn.click();
+              await page.waitForTimeout(2000);
+            }
+          }
+
+          // Return to giveaway asset page and Add to Cart
+          console.log(`    Adding "${title}" to cart...`);
+          await page.goto(assetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
           await page.waitForTimeout(3000);
 
-          // Apply coupon
-          const couponInput = page.locator('input[placeholder*="Coupon" i], input[placeholder*="Promo" i], input[name*="coupon" i], input[id*="coupon" i]').first();
-          if (await couponInput.isVisible()) {
-            console.log(`    Applying coupon: ${couponCode}...`);
-            await couponInput.fill(couponCode);
-            await page.locator('button:has-text("Apply"), button:has-text("Применить")').first().click();
+          const addToCartBtn = page.locator('button[aria-label="Add to Cart"], button:has-text("Add to Cart")').first();
+          if (await addToCartBtn.isVisible()) {
+            await addToCartBtn.click();
             await page.waitForTimeout(3000);
           }
 
-          // Complete checkout
-          const checkoutBtn = page.locator('button:has-text("Pay now"), button:has-text("Complete"), button:has-text("Proceed to checkout")').first();
-          if (await checkoutBtn.isVisible()) {
-            await checkoutBtn.click();
-            await page.waitForTimeout(5000);
+          // Navigate to cart
+          console.log('    Navigating to cart...');
+          await page.goto('https://assetstore.unity.com/account/cart', { waitUntil: 'domcontentloaded', timeout: 35000 });
+          await page.waitForTimeout(3000);
+
+          // Proceed to Checkout
+          const proceedBtn = page.locator('button:has-text("Proceed to Checkout")').first();
+          if (!(await proceedBtn.isVisible())) {
+            throw new Error('Proceed to Checkout button not found in cart');
+          }
+          await proceedBtn.click();
+          await page.waitForTimeout(2000);
+
+          // Handle Terms of Service modal if prompted
+          const acceptBtn = page.locator('button:has-text("Accept")').filter({ hasText: 'Accept' }).last();
+          if (await acceptBtn.isVisible().catch(() => false)) {
+            console.log('    Accepting Terms of Service modal...');
+            await acceptBtn.click();
+          }
+
+          // Wait for transition to checkout (pay.unity.com)
+          for (let i = 0; i < 20; i++) {
+            await page.waitForTimeout(1000);
+            if (page.url().includes('pay.unity.com') || page.url().includes('checkout')) break;
+          }
+          await page.waitForTimeout(3000);
+
+          // Fill address fields defensively if required by Unity for new accounts
+          const addressForm = page.locator('#org_address_form');
+          if (await addressForm.isVisible().catch(() => false)) {
+            console.log('    Completing required billing address fields...');
+            const regionSelect = page.locator('select[name="sta[region]"]');
+            if (await regionSelect.count() > 0) {
+              await regionSelect.selectOption({ index: 1 }).catch(() => {});
+            }
+            const setField = async (selector, val) => {
+              const el = page.locator(selector);
+              if (await el.count() > 0 && !(await el.inputValue().catch(() => ''))) {
+                await el.fill(val).catch(() => {});
+              }
+            };
+            const defaultName = (typeof user === 'string' && user.split('@')[0]) || 'User';
+            await setField('input[name="sta[firstName]"]', defaultName);
+            await setField('input[name="sta[lastName]"]', 'Claimer');
+            await setField('input[name="sta[email]"]', (typeof user === 'string' && user.includes('@')) ? user : `${defaultName}@example.com`);
+            await setField('input[name="sta[companyName]"]', 'Studio');
+            await setField('input[name="sta[phoneNumber]"]', '1234567890');
+            await setField('input[name="sta[streetAddress]"]', 'Main Street 1');
+            await setField('input[name="sta[postalCode]"]', '10001');
+            await setField('input[name="sta[locality]"]', 'City');
+
+            const vatNoLabel = page.locator('label[for="vatRegisteredNo"]');
+            if (await vatNoLabel.isVisible().catch(() => false)) {
+              await vatNoLabel.click().catch(() => {});
+              await page.waitForTimeout(1000);
+            }
+          }
+
+          // Apply coupon code if not already applied
+          const couponActive = (await page.locator(`text=${couponCode}`).count()) > 0;
+          if (!couponActive) {
+            console.log(`    Applying coupon: ${couponCode}...`);
+            const couponInput = page.locator('dd.input input[type="text"]:visible, input[placeholder*="Coupon" i], input[placeholder*="Promo" i]').first();
+            const applyBtn = page.locator('dd.input button.btn:visible, button:has-text("Apply"), button:has-text("Применить")').first();
+            if (await couponInput.isVisible()) {
+              await couponInput.fill(couponCode);
+              await page.waitForTimeout(1000);
+              await applyBtn.click();
+              await page.waitForTimeout(4000);
+            }
+          }
+
+          // Accept agreement checkbox on order
+          console.log('    Accepting purchase terms...');
+          await page.evaluate(() => {
+            const terms = document.querySelectorAll('#order_terms, input[name="term"]');
+            terms.forEach(cb => {
+              cb.checked = true;
+              cb.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+          });
+          await page.waitForTimeout(1000);
+
+          // Submit final checkout
+          const payBtn = page.locator('button.btn:visible').filter({ hasText: /Заплатить немедленно|Pay now|Complete|Place order|Оплатить/i }).first();
+          if (!(await payBtn.isVisible())) {
+            throw new Error('Checkout confirmation button not visible');
+          }
+
+          console.log('    Submitting final order...');
+          await payBtn.click();
+
+          // Wait for order confirmation
+          let orderConfirmed = false;
+          for (let i = 0; i < 25; i++) {
+            await page.waitForTimeout(1000);
+            const url = page.url();
+            if (url.includes('/confirm') || url.includes('/thank-you') || url.includes('/success') || (url.includes('/orders/') && !url.includes('checkout'))) {
+              orderConfirmed = true;
+              break;
+            }
+          }
+
+          if (orderConfirmed || (await page.locator('text=Thanks for your order, text=Thank you').count()) > 0) {
             console.log(`    >>> Successfully claimed: "${title}"!`);
             db.data[user][assetId].status = 'claimed';
             db.data[user][assetId].time = datetime();
             notifyItem.status = 'claimed';
             await page.screenshot({ path: screenshot(`${filenamify(title)}_${filenamify(datetime())}.png`) }).catch(() => {});
           } else {
-            throw new Error('Checkout button not visible in cart');
+            throw new Error(`Order checkout did not reach confirmation page (current URL: ${page.url()})`);
           }
         }
       }
