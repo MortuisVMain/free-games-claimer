@@ -1,7 +1,7 @@
 // Unity Asset Store claimer
 // Automatically claims the weekly paid asset featured in "Publisher of the Week / Free Asset of the Week".
 
-import { resolve, jsonDb, datetime, filenamify, notify, html_game_list, handleSIGINT } from './src/util.js';
+import { resolve, jsonDb, datetime, filenamify, notify, html_game_list, handleSIGINT, recordClaimStat, getStatsSummary } from './src/util.js';
 import { cfg } from './src/config.js';
 import { launchContext } from './src/browser.js';
 
@@ -37,32 +37,38 @@ try {
   // 1. Check login state by testing cart access
   console.log('Checking Unity ID login status...');
   await page.goto('https://assetstore.unity.com/account/cart', { waitUntil: 'domcontentloaded', timeout: 35000 });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(3000);
 
   // Clear cookie banner if present
   page.locator('button:has-text("Accept All Cookies"), button:has-text("Одобрить все")').first().click().catch(() => {});
 
-  const isLoggedOut = page.url().includes('id.unity.com') || (await page.locator('input#email, input[name="email"]').count()) > 0;
+  const isLoggedOut = page.url().includes('id.unity.com') ||
+    page.url().includes('login.unity.com') ||
+    (await page.locator('button:has-text("Sign in"), button:has-text("Sign up"), a:has-text("Sign in"), input#email, input[name="email"]').count()) > 0;
 
   if (isLoggedOut) {
     const loginPrompt = 'Not signed in to Unity ID. Run with --show to login: ClaimGames.cmd --show --claim unity';
     console.warn(`[WARN] ${loginPrompt}`);
-    if (cfg.headless) {
+    if (!cfg.show || process.env.FGC_MINIMIZE == '1') {
       console.log('Skipping Unity Asset Store (requires interactive login once via --show).');
-      // Do not crash the entire scheduled run; exit gracefully
+      await notify('Unity Asset Store: Not signed in. Run "ClaimGames.cmd --show --claim unity" to log in.');
       await context.close();
       process.exit(0);
     } else {
       console.log('Waiting for manual login in the browser window (up to 3 minutes)...');
-      await page.waitForURL('**/assetstore.unity.com/**', { timeout: cfg.login_timeout || 180000 });
+      await page.waitForURL(url => url.href.includes('assetstore.unity.com') && !url.href.includes('login') && !url.href.includes('sign-in'), { timeout: cfg.login_timeout || 180000 });
       console.log('Login detected! Continuing to asset discovery...');
     }
   }
 
-  // 2. Discover Publisher of the Week free asset and weekly coupon code
   console.log('Navigating to Publisher Sale page: https://assetstore.unity.com/publisher-sale ...');
   await page.goto('https://assetstore.unity.com/publisher-sale', { waitUntil: 'domcontentloaded', timeout: 45000 });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(3000);
+
+  // Suppress Cookiebot and survey overlays non-blockingly
+  await page.addStyleTag({
+    content: '#CybotCookiebotDialog, .onetrust-pc-dark-filter, [class*="SurveyModal"] { display: none !important; pointer-events: none !important; }'
+  }).catch(() => {});
 
   // Find giveaway container
   const banner = page.locator('text=PUBLISHER ASSET GIVEAWAY').first();
@@ -123,11 +129,11 @@ try {
           if (await clearCartBtn.isVisible().catch(() => false)) {
             console.log('    Clearing existing cart items...');
             await clearCartBtn.click();
-            await page.waitForTimeout(1000);
             const confirmClearBtn = page.locator('button:has-text("Confirm")').first();
+            await confirmClearBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
             if (await confirmClearBtn.isVisible().catch(() => false)) {
               await confirmClearBtn.click();
-              await page.waitForTimeout(2000);
+              await page.waitForTimeout(3000);
             }
           }
 
@@ -214,10 +220,21 @@ try {
             }
           }
 
+          // CRITICAL SAFETY GUARD: Verify total is strictly 0 before touching confirm buttons
+          console.log('    Verifying cart total is strictly $0.00 / 0.00...');
+          const isZeroPrice = await page.waitForFunction(() => {
+            const text = document.body.innerText;
+            return /(?:Total|Итого|Сумма)[\s\S]{0,40}?(?:[$€£¥₽]\s*0(?:[.,]00)?|0(?:[.,]00)?\s*[$€£¥₽])/i.test(text);
+          }, { timeout: 15000 }).catch(() => false);
+
+          if (!isZeroPrice) {
+            throw new Error('Safety guard tripped: Cart total is not $0.00. Aborting checkout to prevent accidental charges.');
+          }
+
           // Accept agreement checkbox on order
           console.log('    Accepting purchase terms...');
           await page.evaluate(() => {
-            const terms = document.querySelectorAll('#order_terms, input[name="term"]');
+            const terms = document.querySelectorAll('#order_terms, input[name="term"], input[type="checkbox"]');
             terms.forEach(cb => {
               cb.checked = true;
               cb.dispatchEvent(new Event('change', { bubbles: true }));
@@ -226,7 +243,19 @@ try {
           await page.waitForTimeout(1000);
 
           // Submit final checkout
-          const payBtn = page.locator('button.btn:visible').filter({ hasText: /Заплатить немедленно|Pay now|Complete|Place order|Оплатить/i }).first();
+          const payBtn = page.locator([
+            'button[type="submit"]:not([disabled])',
+            'button.btn:visible',
+            'button:has-text("Pay now")',
+            'button:has-text("Complete order")',
+            'button:has-text("Confirm")',
+            'button:has-text("Place order")',
+            'button:has-text("Оплатить")',
+            'button:has-text("Заплатить немедленно")',
+            'button:has-text("Подтвердить")',
+          ].join(', ')).filter({ hasText: /pay|complete|confirm|order|оплат|подтверд|заказ|немедленно/i }).first();
+
+          await payBtn.scrollIntoViewIfNeeded().catch(() => {});
           if (!(await payBtn.isVisible())) {
             throw new Error('Checkout confirmation button not visible');
           }
@@ -249,6 +278,7 @@ try {
             console.log(`    >>> Successfully claimed: "${title}"!`);
             db.data[user][assetId].status = 'claimed';
             db.data[user][assetId].time = datetime();
+            await recordClaimStat('unity', { title, url: assetUrl }).catch(() => {});
             notifyItem.status = 'claimed';
             await page.screenshot({ path: screenshot(`${filenamify(title)}_${filenamify(datetime())}.png`) }).catch(() => {});
           } else {
@@ -268,7 +298,8 @@ try {
 } finally {
   await db.write();
   if (notify_games.filter(g => g.status != 'existed').length) {
-    notify(`Unity Asset Store (${user}):<br>${html_game_list(notify_games)}`);
+    const statsSummary = await getStatsSummary().catch(() => null);
+    notify(`Unity Asset Store (${user}):<br>${html_game_list(notify_games, statsSummary)}`);
   }
   await context.close();
 }

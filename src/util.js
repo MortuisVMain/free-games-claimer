@@ -91,4 +91,28 @@ export const notify = html => new Promise((resolve, reject) => {
 
 export const escapeHtml = unsafe => unsafe.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll('\'', '&#039;');
 
-export const html_game_list = games => games.map(g => `- <a href="${g.url}">${escapeHtml(g.title)}</a> (${g.status})`).join('<br>');
+export const recordClaimStat = async (store, { title, url, priceUsd = 0, coverUrl = null }) => {
+  const statsDb = await jsonDb('stats.json', { totalSavedUsd: 0, totalClaimed: 0, history: [] });
+  statsDb.data.totalClaimed = (statsDb.data.totalClaimed || 0) + 1;
+  statsDb.data.totalSavedUsd = Number(((statsDb.data.totalSavedUsd || 0) + (Number(priceUsd) || 0)).toFixed(2));
+  statsDb.data.history.push({
+    store,
+    title,
+    url,
+    priceUsd: Number(priceUsd) || 0,
+    coverUrl,
+    date: datetime(),
+  });
+  await statsDb.write();
+  return statsDb.data;
+};
+
+export const getStatsSummary = async () => {
+  const statsDb = await jsonDb('stats.json', { totalSavedUsd: 0, totalClaimed: 0, history: [] });
+  return `💰 Всего сэкономлено: $${statsDb.data.totalSavedUsd || 0} (${statsDb.data.totalClaimed || 0} раздач)`;
+};
+
+export const html_game_list = (games, statsSummary = null) => {
+  const list = games.map(g => `- <a href="${g.url}">${escapeHtml(g.title)}</a> (${g.status}${g.price ? ` - $${g.price}` : ''})`).join('<br>');
+  return statsSummary ? `${list}<br><br><b>${escapeHtml(statsSummary)}</b>` : list;
+};

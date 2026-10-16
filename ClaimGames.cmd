@@ -66,14 +66,14 @@ if defined PARSE_ERR (
 )
 if "%CLAIM_SPECIFIED%"=="1" (
     if "%PLATFORMS%"=="" (
-        echo [ERROR] --claim requires at least one platform: epic prime gog steam fab unreal unity
+        echo [ERROR] --claim requires at least one platform: epic prime gog steam fab unreal unity itch
         echo.
         call :usage
         exit /b 1
     )
 ) else (
-    rem no --claim given: claim active platforms (epic, gog, steam, fab, unity)
-    set "PLATFORMS= epic gog steam fab unity"
+    rem no --claim given: claim active platforms (epic, gog, steam, fab, unity, itch)
+    set "PLATFORMS= epic gog steam fab unity itch"
 )
 
 rem ---- update repository ----
@@ -145,8 +145,9 @@ if /i "%~1"=="unreal" goto :add_unreal
 if /i "%~1"=="ue"     goto :add_unreal
 if /i "%~1"=="fab"    goto :add_fab
 if /i "%~1"=="unity"  goto :add_unity
+if /i "%~1"=="itch"   goto :add_itch
 echo [ERROR] Unknown platform: %~1
-echo         Valid platforms: epic prime gog steam fab unreal unity
+echo         Valid platforms: epic prime gog steam fab unreal unity itch
 set "PARSE_ERR=1"
 exit /b 0
 
@@ -171,6 +172,9 @@ exit /b 0
 :add_unity
 if not defined HAS_UNITY ( set "HAS_UNITY=1" & set "PLATFORMS=!PLATFORMS! unity" )
 exit /b 0
+:add_itch
+if not defined HAS_ITCH ( set "HAS_ITCH=1" & set "PLATFORMS=!PLATFORMS! itch" )
+exit /b 0
 
 :claim
 if /i "%~1"=="epic"   goto :claim_epic
@@ -181,6 +185,7 @@ if /i "%~1"=="unreal" goto :claim_unreal
 if /i "%~1"=="ue"     goto :claim_unreal
 if /i "%~1"=="fab"    goto :claim_fab
 if /i "%~1"=="unity"  goto :claim_unity
+if /i "%~1"=="itch"   goto :claim_itch
 exit /b 0
 
 :claim_epic
@@ -203,6 +208,9 @@ call :runScript "fab" "Fab / Unreal Engine"
 exit /b 0
 :claim_unity
 call :runScript "unity" "Unity Asset Store"
+exit /b 0
+:claim_itch
+call :runScript "itch" "Itch.io"
 exit /b 0
 
 :runScript
@@ -241,8 +249,8 @@ echo   --s, -s, --show      Show the browser while claiming
 echo                        Without it, stores that cannot run headless open a
 echo                        minimized browser
 echo   --c, -c, --claim ... Claim only the given platforms, in the given order
-echo                        Valid platforms: epic prime gog steam fab unity
-echo                        Example: ClaimGames.cmd --claim epic fab gog
+echo                        Valid platforms: epic prime gog steam fab unity itch
+echo                        Example: ClaimGames.cmd --claim epic fab gog itch
 echo                        Default [no --claim]: all platforms
 echo   --l, -l, --log       Save all output to ClaimOutput_^<date^>.log
 echo   --u, -u, --update    Update the repository via "git pull"

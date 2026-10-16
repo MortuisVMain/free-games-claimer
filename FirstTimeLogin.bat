@@ -12,6 +12,7 @@ echo - GOG.com
 echo - Steam
 echo - Fab.com (Unreal Engine)
 echo - Unity Asset Store
+echo - Itch.io
 echo.
 echo Все сессии навсегда сохраняются локально в папке data\browser.
 echo ===================================================

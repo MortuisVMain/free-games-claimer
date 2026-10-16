@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 // Browser automation engines that can be used to run the storefront scripts.
 // Each entry maps the value of the AUTOMATION option to the npm package to load
 // and the browser type to launch. Adding another Playwright-compatible library
@@ -29,11 +32,15 @@ const minimizeWindow = async context => {
       const page = context.pages()[0] || await context.newPage();
       const session = await context.newCDPSession(page);
       const { windowId } = await session.send('Browser.getWindowForTarget');
-      await session.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'minimized' } });
+      // Position off-screen in 'normal' state so Chromium doesn't throttle RAF / timers or report hidden=true
+      await session.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: { left: -32000, top: -32000, width: 1280, height: 900, windowState: 'normal' },
+      });
       await session.detach(); // don't leave a CDP connection around
       return;
     } catch (error) {
-      if (attempt == 5) console.warn(`could not minimize the browser window: ${error.message}`);
+      if (attempt == 5) console.warn(`could not move the browser window off-screen: ${error.message}`);
       else await new Promise(resolve => setTimeout(resolve, 200)); // window may not be ready yet, retry
     }
   }
@@ -83,6 +90,31 @@ export const launchContext = async (cfg, options) => {
   const args = options.args ?? [];
   const hasProxyArg = args.some(a => proxyArgs.some(p => a.startsWith(p)));
   if (!hasProxyArg) options.args = [...args, '--no-proxy-server'];
+
+  // If running in background/minimized mode, launch directly off-screen with unthrottled background timers
+  if (options.headless === false && process.env.FGC_MINIMIZE == '1') {
+    const offscreenArgs = [
+      '--window-position=-32000,-32000',
+      '--window-size=1280,900',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--no-default-browser-check',
+    ];
+    options.args = [...(options.args ?? []), ...offscreenArgs];
+  }
+
+  // Stale profile lock cleanup to prevent crashes from previous interrupted runs
+  if (cfg.dir?.browser) {
+    const lockFile = path.resolve(cfg.dir.browser, 'SingletonLock');
+    if (fs.existsSync(lockFile)) {
+      try {
+        fs.unlinkSync(lockFile);
+      } catch {
+        // file might be held by active process
+      }
+    }
+  }
 
   let context;
   const launch = opts => browser.launchPersistentContext(cfg.dir.browser, opts);

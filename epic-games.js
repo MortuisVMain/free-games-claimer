@@ -3,7 +3,7 @@ import { authenticator } from 'otplib';
 import chalk from 'chalk';
 import path from 'path';
 import { existsSync, writeFileSync } from 'fs';
-import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
+import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT, recordClaimStat, getStatsSummary } from './src/util.js';
 import { cfg } from './src/config.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
@@ -17,6 +17,43 @@ const pastelBlue = chalk.hex('#add8e6'); // color for URLs
 console.log(datetime(), 'started checking epic-games');
 
 const db = await jsonDb('epic-games.json', {});
+
+// Pre-flight check: query Epic Games free promo catalog API before launching browser
+if (!cfg.show && !process.env.FGC_FORCE) {
+  try {
+    const promoRes = await fetch('https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    if (promoRes.ok) {
+      const promoData = await promoRes.json();
+      const elements = promoData.data?.Catalog?.searchStore?.elements || [];
+      const activeFreeGames = elements.filter(el => {
+        const promos = el.promotions?.promotionalOffers?.[0]?.promotionalOffers;
+        return promos && promos.length > 0 && el.price?.totalPrice?.discountPrice === 0;
+      });
+
+      if (activeFreeGames.length > 0) {
+        const knownUsers = Object.keys(db.data);
+        const primaryUser = knownUsers[0];
+        if (primaryUser && db.data[primaryUser]) {
+          const allClaimed = activeFreeGames.every(g => {
+            const slug = g.catalogNs?.mappings?.[0]?.pageSlug || g.productSlug || g.urlSlug;
+            const record = db.data[primaryUser][slug] || db.data[primaryUser][g.id];
+            return record && (record.status === 'claimed' || record.status === 'existed');
+          });
+
+          if (allClaimed) {
+            console.log(`[Pre-Flight] All ${activeFreeGames.length} active Epic Games freebies already in library: ${activeFreeGames.map(g => `"${g.title}"`).join(', ')}.`);
+            console.log('[Pre-Flight] Skipping browser launch (fast exit in <500ms).');
+            process.exit(0);
+          }
+        }
+      }
+    }
+  } catch {
+    // If pre-flight network error occurs, gracefully fall through to browser launch
+  }
+}
 
 if (cfg.time) console.time('startup');
 
@@ -317,6 +354,7 @@ try {
         ]);
         db.data[user][game_id].status = 'claimed';
         db.data[user][game_id].time = datetime(); // claimed time overwrites failed/dryrun time
+        await recordClaimStat('epic', { title, url }).catch(() => {});
         console.log('  Claimed successfully!');
         // context.setDefaultTimeout(cfg.timeout);
       } catch (e) {
@@ -343,7 +381,8 @@ try {
 } finally {
   await db.write(); // write out json db
   if (notify_games.filter(g => g.status == 'claimed' || g.status == 'failed').length) { // don't notify if all have status 'existed', 'manual', 'requires base game', 'unavailable-in-region', 'skipped'
-    notify(`epic-games (${user}):<br>${html_game_list(notify_games)}`);
+    const statsSummary = await getStatsSummary().catch(() => null);
+    notify(`epic-games (${user}):<br>${html_game_list(notify_games, statsSummary)}`);
   }
 }
 if (cfg.debug) writeFileSync(path.resolve(cfg.dir.browser, 'cookies.json'), JSON.stringify(await context.cookies()));

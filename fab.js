@@ -1,7 +1,7 @@
 // Fab.com asset claimer (replaces legacy Unreal Engine Marketplace)
 // Automatically discovers and claims Limited-Time Free assets and 100% discount promotional packs.
 
-import { resolve, jsonDb, datetime, filenamify, notify, html_game_list, handleSIGINT } from './src/util.js';
+import { resolve, jsonDb, datetime, filenamify, notify, html_game_list, handleSIGINT, recordClaimStat, getStatsSummary } from './src/util.js';
 import { cfg } from './src/config.js';
 import { launchContext } from './src/browser.js';
 
@@ -195,6 +195,7 @@ try {
           db.data[user][asset.uid].time = datetime();
           dbFab.data[user][asset.uid].status = 'claimed';
           dbFab.data[user][asset.uid].time = datetime();
+          await recordClaimStat('fab', { title: asset.title, url: asset.url }).catch(() => {});
           notifyItem.status = 'claimed';
           await page.screenshot({ path: screenshot(`${filenamify(asset.title)}_${filenamify(datetime())}.png`) }).catch(() => {});
         } else {
@@ -219,7 +220,8 @@ try {
   await db.write();
   await dbFab.write();
   if (notify_games.filter(g => g.status != 'existed').length) {
-    notify(`Fab / Unreal Engine (${user}):<br>${html_game_list(notify_games)}`);
+    const statsSummary = await getStatsSummary().catch(() => null);
+    notify(`Fab / Unreal Engine (${user}):<br>${html_game_list(notify_games, statsSummary)}`);
   }
   await context.close();
 }

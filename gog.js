@@ -14,6 +14,26 @@ console.log(datetime(), 'started checking gog');
 
 const db = await jsonDb('gog.json', {});
 
+// Pre-flight check: check if GOG frontpage has an active giveaway before launching browser
+if (!cfg.show && !process.env.FGC_FORCE) {
+  try {
+    const gogRes = await fetch('https://www.gog.com/en', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    if (gogRes.ok) {
+      const html = await gogRes.text();
+      const hasGiveaway = html.includes('id="giveaway"') || html.includes('class="giveaway"');
+      if (!hasGiveaway) {
+        console.log('[Pre-Flight] Currently no free giveaway on GOG frontpage.');
+        console.log('[Pre-Flight] Skipping browser launch (fast exit in <500ms).');
+        process.exit(0);
+      }
+    }
+  } catch {
+    // If pre-flight network error occurs, fall through to browser launch
+  }
+}
+
 if (cfg.width < 1280) { // otherwise 'Sign in' and #menuUsername are hidden (but attached to DOM), see https://github.com/vogler/free-games-claimer/issues/335
   console.error(`Window width is set to ${cfg.width} but needs to be at least 1280 for GOG!`);
   process.exit(1);
