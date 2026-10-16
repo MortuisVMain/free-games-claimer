@@ -131,7 +131,7 @@ try {
   if (cfg.time) console.time('claim all games');
 
   // Detect free games
-  const game_loc = page.locator('a:has(span:text-is("Free Now"))');
+  const game_loc = page.locator('a:has(span:text-is("Free Now")), a:has(span:text-is("Бесплатно сейчас"))');
   await game_loc.last().waitFor().catch(_ => {
     // rarely there are no free games available -> catch Timeout
     // TODO would be better to wait for alternative like 'coming soon' instead of waiting for timeout
@@ -151,14 +151,15 @@ try {
   for (const url of urls) {
     if (cfg.time) console.time('claim game');
     await page.goto(url); // , { waitUntil: 'domcontentloaded' });
-    // when loading, the button text is empty -> need to wait for some text {'get', 'in library', 'requires base game'} -> just wait for e or i to not be too specific; :text-matches("\w+") somehow didn't work - https://github.com/vogler/free-games-claimer/issues/375
+    // when loading, the button text is empty -> need to wait for some text {'get', 'in library', 'requires base game', 'получить', 'в библиотеке'}
     await page.waitForFunction(() => {
       // eslint-disable-next-line no-undef
-      const btn = document.querySelector('button[data-testid="purchase-cta-button"]');
-      return btn && (/[ei]/i).test(btn.textContent) && btn.textContent != 'Loading';
+      const btn = document.querySelector('button[data-testid="purchase-cta-button"], button[class*="sidebarBuyButton"]') ||
+        Array.from(document.querySelectorAll('button')).find(b => /(get|получить|in library|в библиотеке|requires base game)/i.test(b.textContent));
+      return btn && btn.textContent.trim().length > 0 && btn.textContent.trim() != 'Loading';
     });
-    const purchaseBtn = page.locator('button[data-testid="purchase-cta-button"]').first();
-    const btnText = (await purchaseBtn.innerText()).toLowerCase(); // barrier to block until page is loaded
+    const purchaseBtn = page.locator('button[data-testid="purchase-cta-button"], button[class*="sidebarBuyButton"], button:has-text("Get"), button:has-text("Получить"), button:has-text("In Library"), button:has-text("В библиотеке")').first();
+    const btnText = (await purchaseBtn.innerText()).toLowerCase().trim(); // barrier to block until page is loaded
 
     // click Continue if 'This game contains mature content recommended only for ages 18+'
     if (await page.locator('button:has-text("Continue")').count() > 0) {
@@ -179,7 +180,11 @@ try {
     let title;
     let bundle_includes;
     if (await page.locator('span:text-is("About Bundle")').count()) {
-      title = (await page.locator('span:has-text("Buy"):left-of([data-testid="purchase-cta-button"])').first().innerText()).replace('Buy ', '');
+      try {
+        title = (await page.locator('span:has-text("Buy"):left-of(button[data-testid="purchase-cta-button"], button[class*="sidebarBuyButton"])').first().innerText()).replace(/Buy\s+/i, '');
+      } catch {
+        title = await page.locator('h1').first().innerText();
+      }
       // h1 first didn't exist for bundles but now it does... However h1 would e.g. be 'Fallout® Classic Collection' instead of 'Fallout Classic Collection'
       try {
         bundle_includes = await Promise.all((await page.locator('.product-card-top-row h5').all()).map(b => b.innerText()));
@@ -197,13 +202,13 @@ try {
     const notify_game = { title, url, status: 'failed' };
     notify_games.push(notify_game); // status is updated below
 
-    if (btnText == 'in library') {
+    if (btnText == 'in library' || /in library|в библиотеке/i.test(btnText)) {
       console.log(pastelGreen('  Already in library! Nothing to claim.'));
       if (!existedInDb) await notify(`Game already in library: ${url}`);
       notify_game.status = 'existed';
       db.data[user][game_id].status ||= 'existed'; // does not overwrite claimed or failed
       if (db.data[user][game_id].status.startsWith('failed')) db.data[user][game_id].status = 'manual'; // was failed but now it's claimed
-    } else if (btnText == 'requires base game') {
+    } else if (btnText == 'requires base game' || /requires base game|требуется базовая игра/i.test(btnText)) {
       console.log('  Requires base game! Nothing to claim.');
       notify_game.status = 'requires base game';
       db.data[user][game_id].status ||= 'failed:requires-base-game';
@@ -234,10 +239,10 @@ try {
       }).catch(_ => { });
 
       // it then creates an iframe for the purchase
-      await page.waitForSelector('#webPurchaseContainer iframe'); // TODO needed?
-      const iframe = page.frameLocator('#webPurchaseContainer iframe');
+      await page.waitForSelector('iframe[src*="checkout"], #webPurchaseContainer iframe'); // support both old and new checkout iframe
+      const iframe = page.frameLocator('iframe[src*="checkout"], #webPurchaseContainer iframe');
       // skip game if unavailable in region, https://github.com/vogler/free-games-claimer/issues/46 TODO check games for account's region
-      if (await iframe.locator(':has-text("unavailable in your region")').count() > 0) {
+      if (await iframe.locator(':has-text("unavailable in your region"), :has-text("недоступно в вашем регионе")').count() > 0) {
         console.error('  This product is unavailable in your region!');
         db.data[user][game_id].status = notify_game.status = 'unavailable-in-region';
         if (cfg.time) console.timeEnd('claim game');
@@ -250,7 +255,7 @@ try {
           notify('epic-games: EG_PARENTALPIN not set. Need to enter Parental Control PIN manually.');
         }
         await iframe.locator('input.payment-pin-code__input').first().pressSequentially(cfg.eg_parentalpin);
-        await iframe.locator('button:has-text("Continue")').click({ delay: 11 });
+        await iframe.locator('button:has-text("Continue"), button:has-text("Продолжить")').click({ delay: 11 });
       }).catch(_ => { });
 
       if (cfg.debug) await page.pause();
@@ -262,11 +267,13 @@ try {
       }
 
       // Playwright clicked before button was ready to handle event, https://github.com/vogler/free-games-claimer/issues/84#issuecomment-1474346591
-      // Epic renamed the checkout button from "Place Order" to "Add to library" (new "this game is free" layout) - support both
-      await iframe.locator('button:not(:has(.payment-loading--loading))').filter({ hasText: /Add to library|Place Order/ }).click({ delay: 11 });
+      // Epic renamed the checkout button from "Place Order" to "Add to library" (new "this game is free" layout) - support both languages
+      const checkoutBtn = iframe.locator('button:not(:has(.payment-loading--loading))').filter({ hasText: /Add to library|Place Order|Добавить в библиотеку|Оформить заказ/i }).first();
+      await checkoutBtn.waitFor({ timeout: 25000 });
+      await checkoutBtn.click({ delay: 11 });
 
       // I Agree button is only shown for EU accounts! https://github.com/vogler/free-games-claimer/pull/7#issuecomment-1038964872
-      const btnAgree = iframe.locator('button:has-text("I Accept")');
+      const btnAgree = iframe.locator('button:has-text("I Accept"), button:has-text("Принять")');
       btnAgree.waitFor().then(() => btnAgree.click()).catch(_ => { }); // EU: wait for and click 'I Agree'
       try {
         // context.setDefaultTimeout(100 * 1000); // give time to solve captcha, iframe goes blank after 60s?
@@ -287,17 +294,25 @@ try {
           console.error('  Failed to challenge captcha, please try again later.');
           await notify('epic-games: failed to challenge captcha. Please check.');
         }).catch(_ => { });
+        page.locator('iframe[src*="arkose"], iframe[src*="talon"], iframe[title*="arkose"]').waitFor({ timeout: 5000 }).then(async () => {
+          console.warn('  Got Arkose captcha challenge! Please run "ClaimGames.cmd --show --claim epic" to complete it in browser once.');
+          await notify(`epic-games: got Arkose captcha challenge for ${title}. Run with SHOW=1 to solve it.`);
+        }).catch(_ => { });
         // The confirmation differs between Epic layouts: "Thanks for your order!" on the old checkout,
         // "It's all yours" etc. on the new one, or just the purchase button flipping to "In Library"; wait for whichever shows up
         await Promise.any([
           page.locator('text=Thanks for your order!').waitFor({ state: 'attached' }), // old checkout layout
           page.locator('text=It\'s all yours').waitFor({ state: 'attached' }),
+          page.locator('text=Спасибо за заказ').waitFor({ state: 'attached' }),
+          page.locator('text=Все готово').waitFor({ state: 'attached' }),
           page.locator('text=Download the Epic Games Launcher to play').waitFor({ state: 'attached' }),
           page.locator('text=Is Epic Games Launcher installed?').waitFor({ state: 'attached' }),
+          page.locator('text=Загрузите программу запуска Epic Games').waitFor({ state: 'attached' }),
           page.waitForFunction(() => { // new layout closes the iframe and flips the purchase button to "In Library"
             // eslint-disable-next-line no-undef
-            const btn = document.querySelector('button[data-testid="purchase-cta-button"]');
-            return btn && (/in library/i).test(btn.textContent);
+            const btn = document.querySelector('button[data-testid="purchase-cta-button"], button[class*="sidebarBuyButton"]') ||
+              Array.from(document.querySelectorAll('button')).find(b => /(in library|в библиотеке)/i.test(b.textContent));
+            return btn && (/in library|в библиотеке/i).test(btn.textContent);
           }),
         ]);
         db.data[user][game_id].status = 'claimed';
